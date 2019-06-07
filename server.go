@@ -42,6 +42,8 @@ func initializeCameras() int {
 	if cameras < 2 {
 		log.Fatal(fmt.Printf("Bummer, detected %d cameras...", cameras))
 	}
+	log.Printf("Downward facing camera: ID 1")
+	log.Printf("Upward facing camera: ID 5")
 	log.Printf("ImgInit detected %d cameras", cameras)
 
 	return cameras
@@ -80,7 +82,7 @@ func imgSetWidthHeight(camera int, width int, height int) int {
 //		camera ID
 func imgReadAsy(camera int, width int, height int, timeout int) (int, []byte) {
 	log.Printf("imgReadAsy camera:%d width:%d height:%d timeout:%d", camera, width, height, timeout)
-	
+
 	var buffer = make([]byte, width*height, width*height)
 	var f = mod.NewProc("img_readAsy")
 	ret, _, _ := f.Call(uintptr(camera), uintptr(unsafe.Pointer(&buffer[0])), uintptr(width*height), uintptr(timeout))
@@ -104,6 +106,7 @@ func imgReadAsy(camera int, width int, height int, timeout int) (int, []byte) {
 // Returns:
 //		camera ID
 func imgLed(camera int, mode int) int {
+	log.Printf("imgLed camera:%d mode:%d", camera, mode)
 	var f = mod.NewProc("img_led")
 	ret, _, _ := f.Call(uintptr(camera), uintptr(mode))
 	return int(ret) // retval is cameraID
@@ -115,6 +118,7 @@ func imgLed(camera int, mode int) int {
 // Returns:
 //		camera ID
 func imgReset(camera int) int {
+	log.Printf("imgReset camera:%d", camera)
 	var f = mod.NewProc("img_reset")
 	ret, _, _ := f.Call(uintptr(camera))
 	return int(ret) // retval is cameraID
@@ -127,6 +131,7 @@ func imgReset(camera int) int {
 // Returns:
 //		camera ID
 func imgSetExposure(camera int, exposure int) int {
+	log.Printf("imgSetExposure camera:%d exposure:%d", camera, exposure)
 	var f = mod.NewProc("img_set_exp")
 	ret, _, _ := f.Call(uintptr(camera), uintptr(exposure))
 	return int(ret) // retval is cameraID
@@ -139,6 +144,7 @@ func imgSetExposure(camera int, exposure int) int {
 // Returns:
 //		camera ID
 func imgSetGain(camera int, gain int) int {
+	log.Printf("imgSetGain camera:%d gain:%d", camera, gain)
 	var f = mod.NewProc("img_set_gain")
 	ret, _, _ := f.Call(uintptr(camera), uintptr(gain))
 	return int(ret) // retval is cameraID
@@ -152,9 +158,18 @@ func imgSetGain(camera int, gain int) int {
 // Returns:
 //		camera ID
 func imgSetLt(camera int, a2 int, a3 int) int {
-	var f = mod.NewProc("img_set_gain")
+	log.Printf("imgReset camera:%d a2:%d a3:%d", camera, a2, a3)
+	var f = mod.NewProc("img_set_lt")
 	ret, _, _ := f.Call(uintptr(camera), uintptr(a2), uintptr(a3))
 	return int(ret) // retval is cameraID
+}
+
+// isValidCamera checks for specified down camera (1) or up camera (5)
+func isValidCamera(cameraID int) bool {
+	if (cameraID == 1) || (cameraID == 5) {
+		return true
+	}
+	return false
 }
 
 // imgReadAsyHandler is a handler for /cameras/{cameraId}/imgReadAsy
@@ -168,11 +183,11 @@ func imgReadAsyHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
 	cameraID, _ := strconv.Atoi(vars["cameraId"])
-	if cameraID >= cameras {
-		http.Error(w, "Invalid camera", 500)
-		return
-	}
-	
+	if !isValidCamera(cameraID) {
+	 	http.Error(w, "Invalid camera", 500)
+	 	return
+	 }
+
 	width, _ := strconv.Atoi(vars["width"])
 	height, _ := strconv.Atoi(vars["height"])
 	timeout, _ := strconv.Atoi(vars["timeout"])
@@ -192,16 +207,16 @@ func imgReadAsyHandler(w http.ResponseWriter, r *http.Request) {
 //		height: Image height
 func imgSetWidthHeightHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	
+
 	cameraID, _ := strconv.Atoi(vars["cameraId"])
-	if cameraID < cameras {
-		http.Error(w, "Invalid camera", 500)
-		return
-	}
+	if !isValidCamera(cameraID) {
+	 	http.Error(w, "Invalid camera", 500)
+	 	return
+	 }
 
 	width, _ := strconv.Atoi(vars["width"])
 	height, _ := strconv.Atoi(vars["height"])
-	
+
 	imgSetWidthHeight(cameraID, width, height)
 }
 
@@ -210,12 +225,12 @@ func imgSetWidthHeightHandler(w http.ResponseWriter, r *http.Request) {
 //		mode : TBD
 func imgLedHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	
+
 	cameraID, _ := strconv.Atoi(vars["cameraId"])
-	if cameraID < cameras {
-		http.Error(w, "Invalid camera", 500)
-		return
-	}
+	if !isValidCamera(cameraID) {
+	 	http.Error(w, "Invalid camera", 500)
+	 	return
+	 }
 
 	mode, _ := strconv.Atoi(vars["mode"])
 
@@ -227,7 +242,7 @@ func imgResetHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
 	cameraID, _ := strconv.Atoi(vars["cameraId"])
-	if cameraID < cameras {
+	if !isValidCamera(cameraID) {
 		http.Error(w, "Invalid camera", 500)
 		return
 	}
@@ -240,7 +255,7 @@ func imgSetExposureHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
 	cameraID, _ := strconv.Atoi(vars["cameraId"])
-	if cameraID < cameras {
+	if !isValidCamera(cameraID) {
 		http.Error(w, "Invalid camera", 500)
 		return
 	}
@@ -254,7 +269,7 @@ func imgSetGainHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
 	cameraID, _ := strconv.Atoi(vars["cameraId"])
-	if cameraID < cameras {
+	if !isValidCamera(cameraID) {
 		http.Error(w, "Invalid camera", 500)
 		return
 	}
@@ -268,7 +283,7 @@ func imgSetLtHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
 	cameraID, _ := strconv.Atoi(vars["cameraId"])
-	if cameraID < cameras {
+	if !isValidCamera(cameraID) {
 		http.Error(w, "Invalid camera", 500)
 		return
 	}
@@ -289,7 +304,7 @@ func main() {
 	r.HandleFunc("/cameras/{cameraId}/imgSetExposure", imgSetExposureHandler).Queries("exposure", "{exposure}")
 	r.HandleFunc("/cameras/{cameraId}/imgSetGain", imgSetGainHandler).Queries("gain", "{gain}")
 	r.HandleFunc("/cameras/{cameraId}/imgSetLt", imgSetLtHandler).Queries("a2", "{a2}").Queries("a3", "{a3}")
-	
+
 	port := 8080
 	log.Printf("Listening on : %d", port)
 	http.ListenAndServe(fmt.Sprintf(":%d", port), r)
